@@ -5,7 +5,7 @@ valid_fraction: 0.05
 test_file: "../dataset_3BPA/test_300K.xyz"
 force_key: forces
 energy_key: energy
-E0s: "average"
+E0s: 
   1: -13.663181292231226
   6: -1029.2809654211628 
   7: -1484.1187695035828
