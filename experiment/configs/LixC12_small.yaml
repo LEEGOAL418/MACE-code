@@ -1,4 +1,4 @@
-name: MACE_model
+name: MACE_small_model
 seed: 2024
 train_file: "../data/LixC12/dataset/train.extxyz"
 valid_fraction: 0.05
@@ -7,7 +7,7 @@ forces_key: forces
 energy_key: energy
 E0s: "average"
 model: ScaleShiftMACE
-hidden_irreps: '128x0e + 128x1o'
+hidden_irreps: '64x0e + 64x1o'
 r_max: 4.0
 batch_size: 16
 swa: yes
