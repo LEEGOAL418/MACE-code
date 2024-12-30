@@ -1,17 +1,21 @@
 import os
+import time
 import argparse
 from ase.io import read, write
 from ase.optimize import LBFGS
 from ase.optimize.sciopt import SciPyFminCG
 from ase.io.trajectory import Trajectory
 from mace.calculators.mace import MACECalculator
+from ase.constraints import FixedLine
+
 
 def optimize_structure(
     model_path,
     init_structure_path,
     output_dir,  # 输出文件的根目录
     optimizer="LBFGS",  # 默认使用 LBFGS
-    fmax=0.01
+    fmax=0.01,
+    constrain_c_atoms=False  # 布尔值参数，控制是否施加约束
 ):
     """
     优化原子结构并记录优化过程
@@ -21,6 +25,7 @@ def optimize_structure(
     :param output_dir: 输出文件的根目录
     :param optimizer: 优化算法选择 ("LBFGS" 或 "CG")
     :param fmax: 最大力收敛标准 (eV/Å)
+    :param constrain_c_atoms: 布尔值参数，控制是否对 C 原子施加约束（只允许在 z 方向移动）
     """
     # 确保输出目录存在
     os.makedirs(output_dir, exist_ok=True)
@@ -47,9 +52,23 @@ def optimize_structure(
     # 为初始结构设置 MACE 计算器
     init_conf.set_calculator(calculator)
 
+    # 施加约束（如果指定）
+    if constrain_c_atoms:
+        # 限制所有碳原子仅在z方向上移动
+        carbon_indices = [atom.index for atom in init_conf if atom.symbol == 'C']
+        if carbon_indices:
+            constraints = FixedLine(indices=carbon_indices, direction=[0, 0, 1])
+            init_conf.set_constraint(constraints)
+            print("Applied constraints on carbon atoms to move only along z direction.")
+        else:
+            print("No carbon atoms found to apply constraints.")
+
     # 打印初始能量
     initial_energy = init_conf.get_potential_energy()
     print(f"Initial Energy: {initial_energy:.6f} eV")
+
+    # 记录优化开始时间
+    start_time = time.time()
 
     # 创建 .traj 文件记录优化过程
     traj = Trajectory(traj_file_path, 'w', init_conf)
@@ -66,6 +85,13 @@ def optimize_structure(
 
     # 运行优化
     dyn.run(fmax=fmax)  # 优化停止条件
+
+    # 记录优化结束时间
+    end_time = time.time()
+
+    # 打印优化总时间
+    total_time = end_time - start_time
+    print(f"Optimization completed in {total_time:.2f} seconds.")
 
     # 打印优化后的能量
     optimized_energy = init_conf.get_potential_energy()
@@ -84,13 +110,29 @@ def optimize_structure(
 
     print("Optimization finished!")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Optimize atomic structures using MACE and ASE.")
     parser.add_argument("--model_path", required=True, help="Path to the MACE model file.")
     parser.add_argument("--init_structure_path", required=True, help="Path to the initial structure file.")
     parser.add_argument("--output_dir", required=True, help="Root directory for output files.")
-    parser.add_argument("--optimizer", choices=["LBFGS", "CG"], default="LBFGS", help="Optimization algorithm to use (default: LBFGS).")
-    parser.add_argument("--fmax", type=float, default=0.01, help="Maximum force convergence criteria (default: 0.01 eV/Å).")
+    parser.add_argument(
+        "--optimizer",
+        choices=["LBFGS", "CG"],
+        default="LBFGS",
+        help="Optimization algorithm to use (default: LBFGS)."
+    )
+    parser.add_argument(
+        "--fmax",
+        type=float,
+        default=0.01,
+        help="Maximum force convergence criteria (default: 0.01 eV/Å)."
+    )
+    parser.add_argument(
+        "--constrain_c_atoms",
+        action='store_true',
+        help="Apply constraints on C atoms to move only along z direction."
+    )
 
     args = parser.parse_args()
 
@@ -99,5 +141,6 @@ if __name__ == "__main__":
         init_structure_path=args.init_structure_path,
         output_dir=args.output_dir,
         optimizer=args.optimizer,
-        fmax=args.fmax
+        fmax=args.fmax,
+        constrain_c_atoms=args.constrain_c_atoms
     )
